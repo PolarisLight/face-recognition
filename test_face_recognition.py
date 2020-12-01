@@ -6,12 +6,13 @@ import tqdm
 from cv2 import *
 
 from utils import *
-from dehaze import *
 
-cap = cv2.VideoCapture(0)
+cap = cv2.VideoCapture(0, CAP_DSHOW)
+cap.set(CAP_PROP_EXPOSURE, -6)
 known_face_encodings = []
 known_face_names = []
 resize_rate = 4
+
 
 # initial function
 def init():
@@ -73,11 +74,11 @@ def main():
         ret, frame = cap.read()
         if not ret:
             continue
-
+        face_recognition.face_locations()
         # frame = imlocalbrighten(frame)
 
         # Resize frame of video to 1/4 size for faster face recognition processing
-        small_frame = cv2.resize(frame, (0, 0), fx=1/resize_rate, fy=1/resize_rate)
+        small_frame = cv2.resize(frame, (0, 0), fx=1 / resize_rate, fy=1 / resize_rate)
 
         # Convert the image from BGR color (which OpenCV uses) to RGB color (which face_recognition uses)
         rgb_small_frame = small_frame[:, :, ::-1]
@@ -101,7 +102,6 @@ def main():
 
                 # Or instead, use the known face with the smallest distance to the new face
                 face_distances = face_recognition.face_distance(known_face_encodings, face_encoding)
-                print(known_face_names)
                 print(face_distances)
                 best_match_index = np.argmin(face_distances)
                 if matches[best_match_index]:
@@ -133,7 +133,6 @@ def main():
                     cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 0, 255), 1)
         # Display the resulting image
         cv2.imshow('Video', frame)
-        t = getTickCount()
         # Hit Esc on the keyboard to quit!
         if cv2.waitKey(1) & 0xFF == 27:
             break
