@@ -27,49 +27,93 @@ def DrawChinese(img, text, positive, fontSize=20, fontColor=(0, 255, 0)):
 
 
 class FaceLoader(object):
-    def __init__(self, datadir="face\\"):
-        self.datadir =datadir
-        self.namelist = os.listdir(datadir)
-        self.count = len(self.namelist)
+    def __init__(self, traindatadir="face\\", testdatadir="face\\"):
+        self.traindatadir = traindatadir
+        self.trainnamelist = os.listdir(traindatadir)
+        self.testdatadir = testdatadir
+        self.testnamelist = os.listdir(testdatadir)
+        self.traincount = len(self.trainnamelist)
+        self.testcount = len(self.testnamelist)
 
-    def getData(self):
-        src = np.random.randint(0, self.count)
-        opp = np.random.randint(0, self.count)
+    def getTrainData(self, showpic=False):
+        src = np.random.randint(0, self.traincount)
+        opp = np.random.randint(0, self.traincount)
         while opp == src:
-            opp = np.random.randint(0, self.count)
-        srcdir = self.datadir + self.namelist[src]
+            opp = np.random.randint(0, self.traincount)
+
+        srcdir = self.traindatadir + self.trainnamelist[src]
         srcdir = glob.glob(srcdir + "\\*")
-        oppdir = self.datadir + self.namelist[opp]
+        oppdir = self.traindatadir + self.trainnamelist[opp]
         oppdir = glob.glob(oppdir + "\\*")
-        i = 0
+
         srcimg = []
-        for srcname in srcdir:
-            if np.random.rand() > 0.7:
-                img = cv2.imread(srcname)
-                srcimg.append(img)
-                i += 1
-                if i == 2:
-                    break
-            if srcname == srcdir[-2] and not i:
-                img = cv2.imread(srcname)
-                srcimg.append(img)
-                i += 1
-            if srcname == srcdir[-1] and i == 1:
-                img = cv2.imread(srcname)
-                srcimg.append(img)
+
+        srcnum1 = np.random.randint(0, len(srcdir))
+        srcnum2 = np.random.randint(0, len(srcdir))
+        while srcnum1 == srcnum2:
+            srcnum2 = np.random.randint(0, len(srcdir))
+
+        srcimg.append(cv2.imread(srcdir[srcnum1]))
+        srcimg.append(cv2.imread(srcdir[srcnum2]))
 
         if np.random.rand() > 0.5:
             srcimg.reverse()
-        i = 0
-        for oppname in oppdir:
-            i += 1
-            if np.random.rand() > 0.9:
-                img = cv2.imread(oppname)
-                oppimg = img
-                break
-            if oppname == oppdir[-1]:
-                img = cv2.imread(oppname)
-                oppimg = img
+
+        opp = np.random.randint(0, len(oppdir))
+        oppimg = cv2.imread(oppdir[opp])
+
+        if showpic:
+            cv2.imshow("0", srcimg[0])
+            cv2.imshow("1", srcimg[1])
+            cv2.imshow("2", oppimg)
+            cv2.waitKey(1000)
+
+        src = srcimg[0] / 255.0
+        src = tf.convert_to_tensor(src)
+        src = tf.expand_dims(src, 0, name=None)
+
+        sameperson = srcimg[1] / 255.0
+        sameperson = tf.convert_to_tensor(sameperson)
+        sameperson = tf.expand_dims(sameperson, 0, name=None)
+
+        diffperson = oppimg / 255.0
+        diffperson = tf.convert_to_tensor(diffperson)
+        diffperson = tf.expand_dims(diffperson, 0, name=None)
+
+        return src, sameperson, diffperson
+
+    def getTestData(self, showpic=False):
+        src = np.random.randint(0, self.testcount)
+        opp = np.random.randint(0, self.testcount)
+        while opp == src:
+            opp = np.random.randint(0, self.testcount)
+
+        srcdir = self.testdatadir + self.testnamelist[src]
+        srcdir = glob.glob(srcdir + "\\*")
+        oppdir = self.testdatadir + self.testnamelist[opp]
+        oppdir = glob.glob(oppdir + "\\*")
+
+        srcimg = []
+
+        srcnum1 = np.random.randint(0, len(srcdir))
+        srcnum2 = np.random.randint(0, len(srcdir))
+        while srcnum1 == srcnum2:
+            srcnum2 = np.random.randint(0, len(srcdir))
+
+        srcimg.append(cv2.imread(srcdir[srcnum1]))
+        srcimg.append(cv2.imread(srcdir[srcnum2]))
+
+        if np.random.rand() > 0.5:
+            srcimg.reverse()
+
+        opp = np.random.randint(0, len(oppdir))
+        oppimg = cv2.imread(oppdir[opp])
+
+        if showpic:
+            cv2.imshow("0", srcimg[0])
+            cv2.imshow("1", srcimg[1])
+            cv2.imshow("2", oppimg)
+            cv2.waitKey(1000)
 
         src = srcimg[0] / 255.0
         src = tf.convert_to_tensor(src)
@@ -98,14 +142,6 @@ def get_cos_distance(X1, X2):
     # 计算余弦距离
     cos = X1_X2 / X1_X2_norm
     return cos
-
-
-def cosine(q, a):
-    pooled_len_1 = tf.sqrt(q * q)
-    pooled_len_2 = tf.sqrt(a * a)
-    pooled_mul_12 = q * a
-    score = tf.math.divide(pooled_mul_12, pooled_len_1 * pooled_len_2 + 1e-8, name="scores")
-    return score
 
 
 def celoss_ones(logits):
