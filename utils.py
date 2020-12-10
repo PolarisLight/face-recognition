@@ -32,10 +32,14 @@ class FaceLoader(object):
         self.trainnamelist = os.listdir(traindatadir)
         self.testdatadir = testdatadir
         self.testnamelist = os.listdir(testdatadir)
-        self.traincount = len(self.trainnamelist)
-        self.testcount = len(self.testnamelist)
+        if self.traindatadir == testdatadir:
+            self.traincount = int(len(self.trainnamelist) * 0.7)
+            self.testcount = len(self.trainnamelist) - self.traincount
+        else:
+            self.traincount = len(self.trainnamelist)
+            self.testcount = len(self.testnamelist)
 
-    def getTrainData(self, showpic=False):
+    def getTrainData(self, showpic=False, input_shape=(224, 224, 3)):
         src = np.random.randint(0, self.traincount)
         opp = np.random.randint(0, self.traincount)
         while opp == src:
@@ -67,7 +71,12 @@ class FaceLoader(object):
             cv2.imshow("1", srcimg[1])
             cv2.imshow("2", oppimg)
             cv2.waitKey(1000)
+        # input resize
+        srcimg[0] = cv2.resize(srcimg[0], (input_shape[0], input_shape[1]))
+        srcimg[1] = cv2.resize(srcimg[1], (input_shape[0], input_shape[1]))
+        oppimg = cv2.resize(oppimg, (input_shape[0], input_shape[1]))
 
+        # normalization
         src = srcimg[0] / 255.0
         src = tf.convert_to_tensor(src)
         src = tf.expand_dims(src, 0, name=None)
@@ -88,9 +97,9 @@ class FaceLoader(object):
         while opp == src:
             opp = np.random.randint(0, self.testcount)
 
-        srcdir = self.testdatadir + self.testnamelist[src]
+        srcdir = self.testdatadir + self.testnamelist[self.traincount + src + 1]
         srcdir = glob.glob(srcdir + "\\*")
-        oppdir = self.testdatadir + self.testnamelist[opp]
+        oppdir = self.testdatadir + self.testnamelist[self.traincount + opp + 1]
         oppdir = glob.glob(oppdir + "\\*")
 
         srcimg = []
