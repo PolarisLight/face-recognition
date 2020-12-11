@@ -9,6 +9,11 @@ import tqdm
 from PIL import Image, ImageDraw, ImageFont
 
 
+def cv_imread(file_path):
+    cv_img = cv2.imdecode(np.fromfile(file_path, dtype=np.uint8), -1)
+    return cv_img
+
+
 class FaceDetector(object):
     def __init__(self,
                  modelFile="models\opencv_face_detector_uint8.pb",
@@ -38,12 +43,14 @@ class FaceDetector(object):
                 x2 = int(detections[0, 0, i, 5] * frameWidth)
                 y2 = int(detections[0, 0, i, 6] * frameHeight)
                 bboxes.append([x1, y1, x2, y2])
+                """
                 cv2.rectangle(frameOpencvDnn,
                               (x1, y1),
                               (x2, y2),
                               (0, 255, 0),
                               int(round(frameHeight / 150)),
                               8)
+                """
                 faces.append(frameOpencvDnn[x1:x2, y1:y2])
         return frameOpencvDnn, bboxes, faces
 
@@ -184,6 +191,10 @@ def get_cos_distance(X1, X2):
     # calculate cos distance between two sets
     # more similar more big
     # 求模
+    if isinstance(X1, tf.Tensor):
+        X1 = tf.convert_to_tensor(X1)
+    if isinstance(X2, tf.Tensor):
+        X2 = tf.convert_to_tensor(X2)
     X1_norm = tf.sqrt(tf.reduce_sum(tf.square(X1)))
     X2_norm = tf.sqrt(tf.reduce_sum(tf.square(X2)))
     # 内积
@@ -253,8 +264,14 @@ class FaceDatabase(object):
                     filename = list[-1]
                     name = filename.split(".")[0]
                     if name not in self.known_face_names:
-                        img = cv2.imread(imgname)
-                        face_encoding = self.encodefunction(img)[0]
+                        print(imgname)
+                        img = cv_imread(imgname)
+                        img = cv2.resize(img, (224, 224))
+                        src = img / 255.0
+                        src = tf.convert_to_tensor(src)
+                        img = tf.expand_dims(src, 0, name=None)
+                        face_encoding = self.encodefunction(img)
+                        face_encoding = tf.reshape(face_encoding, -1).numpy().tolist()
                         self.known_face_encodings.append(face_encoding)
                         self.known_face_names.append(name)
                         self.knowm_face[name] = face_encoding
@@ -270,7 +287,11 @@ class FaceDatabase(object):
 
     def getFaceDistance(self, img):
         face_distance = []
-        src_face_code = self.encodefunction(img)[0]
+        img = cv2.resize(img, (224, 224))
+        img = img / 255.0
+        img = tf.convert_to_tensor(img)
+        img = tf.expand_dims(img, 0, name=None)
+        src_face_code = self.encodefunction(img)
         for face_name in self.known_face_names:
             distance = get_cos_distance(src_face_code,
                                         self.knowm_face.get(face_name))
