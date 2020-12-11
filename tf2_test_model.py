@@ -6,7 +6,7 @@ def main(resize_rate=4, threshold=0.7):
 
     database = FaceDatabase(encodefunc=model)
 
-    detecter = FaceDetecter()
+    detecter = FaceDetector()
 
     cap = cv2.VideoCapture(0, cv2.CAP_DSHOW)
     while True:

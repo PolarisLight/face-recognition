@@ -9,7 +9,7 @@ import tqdm
 from PIL import Image, ImageDraw, ImageFont
 
 
-class FaceDetecter(object):
+class FaceDetector(object):
     def __init__(self,
                  modelFile="models\opencv_face_detector_uint8.pb",
                  configFile="models\opencv_face_detector.pbtxt",
