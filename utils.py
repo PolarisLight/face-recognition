@@ -1,10 +1,51 @@
+import csv
 import glob
 import os
 
 import cv2
 import numpy as np
 import tensorflow as tf
+import tqdm
 from PIL import Image, ImageDraw, ImageFont
+
+
+class FaceDetecter(object):
+    def __init__(self,
+                 modelFile="models\opencv_face_detector_uint8.pb",
+                 configFile="models\opencv_face_detector.pbtxt",
+                 dir=None):
+        if dir:
+            modelFile = dir + "_uint8.pb"
+            configFile = dir + ".pbtxt"
+        self.net = cv2.dnn.readNetFromTensorflow(modelFile, configFile)
+
+    def detectFace(self, frame, conf_threshold=0.7):
+        frameOpencvDnn = frame.copy()
+        frameHeight = frameOpencvDnn.shape[0]
+        frameWidth = frameOpencvDnn.shape[1]
+        blob = cv2.dnn.blobFromImage(frameOpencvDnn, 1.0, (300, 300),
+                                     [104, 117, 123], False, False)
+
+        self.net.setInput(blob)
+        detections = self.net.forward()
+        bboxes = []
+        faces = []
+        for i in range(detections.shape[2]):
+            confidence = detections[0, 0, i, 2]
+            if confidence > conf_threshold:
+                x1 = int(detections[0, 0, i, 3] * frameWidth)
+                y1 = int(detections[0, 0, i, 4] * frameHeight)
+                x2 = int(detections[0, 0, i, 5] * frameWidth)
+                y2 = int(detections[0, 0, i, 6] * frameHeight)
+                bboxes.append([x1, y1, x2, y2])
+                cv2.rectangle(frameOpencvDnn,
+                              (x1, y1),
+                              (x2, y2),
+                              (0, 255, 0),
+                              int(round(frameHeight / 150)),
+                              8)
+                faces.append(frameOpencvDnn[x1:x2, y1:y2])
+        return frameOpencvDnn, bboxes, faces
 
 
 # opencv往图片中写入中文,返回图片
@@ -171,3 +212,68 @@ def celoss_zeros(logits):
 
 def get_distance(X1, X2):
     return tf.abs(tf.nn.tanh(tf.square(X1) - tf.square(X2)))
+
+
+class FaceDatabase(object):
+    def __init__(self, file_dir="face_database\\", databasename="my_face_encode", encodefunc=None):
+        self.known_face_encodings = []
+        self.known_face_names = []
+        self.knowm_face = {}
+        if encodefunc == None:
+            import face_recognition
+            self.encodefunction = face_recognition.face_encodings
+        else:
+            self.encodefunction = encodefunc
+        read_file = glob.glob(file_dir + "*")
+        lines = 0
+        if os.path.exists(databasename + '.csv'):
+            with open(databasename + '.csv') as f:
+                f_csv = csv.reader(f)
+                for _ in f_csv:
+                    lines += 1
+                f.close()
+            with open(databasename + '.csv') as f:
+                f_csv = csv.reader(f)
+                with tqdm.tqdm(total=lines) as pbar:
+                    for row in f_csv:
+                        self.known_face_names.append(row[0])
+                        face_encoding = []
+                        for x in row[1:]:
+                            face_encoding.append(float(x))
+                        self.known_face_encodings.append(face_encoding)
+                        self.knowm_face[row[0]] = face_encoding
+                        pbar.set_description("now loading %s" % row[0])
+                        pbar.update(1)
+                f.close()
+        with open(databasename + '.csv', 'a', newline='') as f:
+            f_csv = csv.writer(f)
+            with tqdm.tqdm(total=len(read_file)) as pbar:
+                for imgname in read_file:
+                    list = imgname.split("\\")
+                    filename = list[-1]
+                    name = filename.split(".")[0]
+                    if name not in self.known_face_names:
+                        img = cv2.imread(imgname)
+                        face_encoding = self.encodefunction(img)[0]
+                        self.known_face_encodings.append(face_encoding)
+                        self.known_face_names.append(name)
+                        self.knowm_face[name] = face_encoding
+                        pbar.set_description("now writing %s" % name)
+                        row = [name]
+                        for x in face_encoding:
+                            row.append(x)
+                        f_csv.writerow(row)
+                    else:
+                        pbar.set_description("skipping %s" % name)
+                    pbar.update(1)
+            f.close()
+
+    def getFaceDistance(self, img):
+        face_distance = []
+        src_face_code = self.encodefunction(img)[0]
+        for face_name in self.known_face_names:
+            distance = get_cos_distance(src_face_code,
+                                        self.knowm_face.get(face_name))
+            distance = distance / 2 + 0.5
+            face_distance.append(distance)
+        return face_distance

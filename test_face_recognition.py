@@ -2,10 +2,11 @@ import csv
 import glob
 
 import face_recognition
+import numpy as np
 import tqdm
 from cv2 import *
 
-from utils import *
+from utils import DrawChinese
 
 cap = cv2.VideoCapture(0, CAP_DSHOW)
 cap.set(CAP_PROP_EXPOSURE, -6)
@@ -74,7 +75,6 @@ def main():
         ret, frame = cap.read()
         if not ret:
             continue
-        face_recognition.face_locations()
         # frame = imlocalbrighten(frame)
 
         # Resize frame of video to 1/4 size for faster face recognition processing
@@ -102,7 +102,6 @@ def main():
 
                 # Or instead, use the known face with the smallest distance to the new face
                 face_distances = face_recognition.face_distance(known_face_encodings, face_encoding)
-                print(face_distances)
                 best_match_index = np.argmin(face_distances)
                 if matches[best_match_index]:
                     name = known_face_names[best_match_index]
